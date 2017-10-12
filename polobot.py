@@ -346,6 +346,7 @@ features = features[onlyusemask]
 # FEATURE GENERATION. Take feature values from last tick
 XX_generated = XX[1:]
 XX = np.hstack((XX[:-1],XX_generated))
+yy = yy[:-1]
 
 XX_train,XX_test,yy_train,yy_test = train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats)
 
