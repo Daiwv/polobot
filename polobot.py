@@ -364,7 +364,7 @@ XX_train,XX_test,yy_train,yy_test = train_test_split(XX,yy,test_size=test_size,s
 
 # SCALING
 where_vol=['volume' in x for x in onlyuse]
-XX_train[where_vol], XX_test[where_vol] = zcmn_scaling(XX_train,XX_test)
+XX_train[where_vol], XX_test[where_vol] = zcmn_scaling(XX_train[where_vol],XX_test[where_vol])
 
 MLA = get_function(MLA) # Pulls in machine learning algorithm from settings
 clf = MLA().set_params(**MLAset) # Sets the settings
