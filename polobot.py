@@ -30,7 +30,7 @@ from sklearn import metrics
 from sklearn import tree
 from sklearn.model_selection import train_test_split
 
-#SETTINGS
+# SETTINGS
 MLA = 'sklearn.ensemble.RandomForestRegressor'                             # Which MLA to load
 MLAset = {'n_estimators': 256, 'n_jobs': 4,'max_features': None, 'max_depth': None, 'verbose': 2}
 # features to choose from:
@@ -38,11 +38,12 @@ MLAset = {'n_estimators': 256, 'n_jobs': 4,'max_features': None, 'max_depth': No
 onlyuse = ['sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
 test_size = 0.1
 shuffle_cats = False
-n_cat=10000
+n_cat=30000
 
 
 logger = logging.getLogger(__name__)
 
+# FUNCTIONS
 def rsi(df, window, targetcol='weightedAverage', colname='rsi'):
     """ Calculates the Relative Strength Index (RSI) from a pandas dataframe
     http://stackoverflow.com/a/32346692/3389859
@@ -301,7 +302,7 @@ logging.basicConfig(level=logging.DEBUG)
 # websocket.enableTrace(True)
 ticker = dictTicker()
 try:
-    ticker.start()
+    ticker.start() # Start listening to market tickers
 #    for i in range(3):
 #        sleep(5)
 #        pprint.pprint(ticker('USDT_BTC'))
@@ -313,12 +314,12 @@ logging.getLogger("poloniex").setLevel(logging.INFO)
 logging.getLogger('requests').setLevel(logging.ERROR)
 api = Poloniex(jsonNums=float)
 
-def updateChart(market):
+def updateChart(market): # updates given market when called
     df = Chart(api, market).dataFrame()
     df.dropna(inplace=True)
     return df
 
-def get_function(function_string):
+def get_function(function_string): # Used to set machine learning algorithm and settings
     import importlib
     module, function = function_string.rsplit('.', 1)
     module = importlib.import_module(module)
@@ -327,43 +328,45 @@ def get_function(function_string):
 
 df = updateChart('BTC_ETH')
 
-ts = (df.index[-1] - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's')
-latest_time=datetime.utcfromtimestamp(ts)
+#ts = (df.index[-1] - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's')
+#latest_time=datetime.utcfromtimestamp(ts)
 
 features = df.columns.values.astype('str') # get column names from dataframe
 XX = df.values # Get column values from dataframe
 XX = np.flipud(XX) # makes latest 5 minute tick XX[0] instead of XX[-1] (flips the array so most recent is at top)
 percentchange = XX[:,18] # Takes percentage train as variable to predict
-XX = XX[1:,:-1] # Takes off latest tick, as we're going to shift the 'percent change since last tick' down. It will become the 'percent change for the next tick'. Also removes the percentage change from the features list 
+XX = XX[1:,:-1] # Takes off latest tick to compensate for the shift, as we're going to shift the 'percent change since last tick' down. It will become the 'percent change for the next tick'. Also removes the percentage change from the features list 
 
-yy=percentchange[:-1]
+yy=percentchange[:-1] # Shift percentage change down
 # NEED TO CUT DOWN FEATURE COLUMNS HERE
-onlyusemask= [x in onlyuse for x in features]
-XX = XX.T[onlyusemask]
+onlyusemask= [x in onlyuse for x in features] # Filters down features to those only in onlyuse array
+XX = XX.T[onlyusemask] # Need to do a stupid transpose
 XX = XX.T
-features = features[onlyusemask]
+features = features[onlyusemask] # Filter feature labels
 # FEATURE GENERATION. Take feature values from last tick
-XX_generated = XX[1:]
-XX = np.hstack((XX[:-1],XX_generated))
-yy = yy[:-1]
+XX_generated = XX[1:] # Give each 5 minute tick the technical indicator vals from last tick
+XX = np.hstack((XX[:-1],XX_generated)) # Tack them on to catalogue and take off the oldest tick to compensate the shift
+yy = yy[:-1] # Take off the oldest prediction value to match
 
-XX = XX[0:n_cat]
-
-XX_train,XX_test,yy_train,yy_test = train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats)
+XX = XX[0:n_cat] # Cut catalogue down to n_cat
+yy = yy[0:n_cat]
+XX_train,XX_test,yy_train,yy_test = train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats) # Split data into train and test set with test_size as ratio
 
 MLA = get_function(MLA) # Pulls in machine learning algorithm from settings
-clf = MLA().set_params(**MLAset)
+clf = MLA().set_params(**MLAset) # Sets the settings
 
 logger.info("Training model ... ")
-clf.fit(XX_train,yy_train)
-results = clf.predict(XX_test)
-mse=metrics.mean_squared_error(yy_test,results)
+clf.fit(XX_train,yy_train) # Train model
+results = clf.predict(XX_test) # Predict results of the test set.
+mse=metrics.mean_squared_error(yy_test,results) # Get MSE
 
 logger.info("Model MSE: %s"%mse)
 logger.info("Model RMSE: %s"%np.sqrt(mse))
 
 percent_diff = results - yy_test
-plt.plot(range(len(percent_diff)),percent_diff)
+plt.plot(range(len(percent_diff)),percent_diff) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
+
+# OLD ARBITRAGE LOGIC - probably not needed for this code.
 #testwallet=1
 #def forward_search():
 #    global n_forw,n_forw_bad, for_run,result_for
