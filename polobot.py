@@ -8,7 +8,6 @@ Created on Thu Oct 12 17:30:36 2017
 from __future__ import print_function
 
 import threading
-import time
 from poloniex import Poloniex
 polo = Poloniex()
 
@@ -17,19 +16,30 @@ import websocket # pip install websocket-client
 from multiprocessing.dummy import Process as Thread
 import json
 import logging
-
-logger = logging.getLogger(__name__)
-
 from time import time,sleep
+from datetime import datetime
 import pprint
 from operator import itemgetter
 from pymongo import MongoClient
 import pandas as pd
 import numpy as np
 
+import sklearn.ensemble.RandomForestRegressor
+from sklearn import metrics
+from sklearn import tree
+from sklearn.model_selection import train_test_split
+
+#SETTINGS
+MLA = 'sklearn.ensemble.RandomForestRegressor'                             # Which MLA to load
+MLAset = {'n_estimators': 256, 'n_jobs': 8}
+# features to choose from:
+# array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
+onlyuse = ['close', 'high', 'low', 'open', 'quoteVolume', 'volume',
+       'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange',
+       'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize',
+       'shadowsize']
 
 logger = logging.getLogger(__name__)
-
 
 def rsi(df, window, targetcol='weightedAverage', colname='rsi'):
     """ Calculates the Relative Strength Index (RSI) from a pandas dataframe
@@ -306,7 +316,38 @@ def updateChart(market):
     df.dropna(inplace=True)
     return df
 
+def get_function(function_string):
+    import importlib
+    module, function = function_string.rsplit('.', 1)
+    module = importlib.import_module(module)
+    function = getattr(module, function)
+    return function
+
 df = updateChart('BTC_ETH')
+
+ts = (df.index[-1] - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's')
+latest_time=datetime.utcfromtimestamp(ts)
+
+n_train=10000
+features = df.columns.values.astype('str') # get column names from dataframe
+XX = df.values # Get column values from dataframe
+XX = np.flipud(XX) # makes latest 5 minute tick XX[0] instead of XX[-1] (flips the array so most recent is at top)
+percentchange = XX[:,18] # Takes percentage train as variable to predict
+XX_wo_latest= XX[1:,:-1] # Takes off latest tick, as we're going to shift the 'percent change since last tick' down. It will become the 'percent change for the next tick'. Also removes the percentage change from the features list 
+
+percentchange_fut=percentchange[:-1]
+
+# NEED TO CUT DOWN FEATURE COLUMNS
+
+XX_train,yy_train,XX_test,yy_test = train_test_split(XX_wo_latest,percentchange_fut,test_size=0.1,shuffle=False)
+
+MLA = get_function(MLA) # Pulls in machine learning algorithm from settings
+clf = MLA().set_params(**MLAset)
+
+clf.fit(XX_train,yy_train)
+clf predict(XX_test)
+
+
 #testwallet=1
 #def forward_search():
 #    global n_forw,n_forw_bad, for_run,result_for
