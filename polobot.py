@@ -23,21 +23,23 @@ from operator import itemgetter
 from pymongo import MongoClient
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
-import sklearn.ensemble.RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor
 from sklearn import metrics
 from sklearn import tree
 from sklearn.model_selection import train_test_split
 
 #SETTINGS
 MLA = 'sklearn.ensemble.RandomForestRegressor'                             # Which MLA to load
-MLAset = {'n_estimators': 256, 'n_jobs': 8}
+MLAset = {'n_estimators': 256, 'n_jobs': 4, 'verbose': 1}
 # features to choose from:
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
-onlyuse = ['close', 'high', 'low', 'open', 'quoteVolume', 'volume',
-       'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange',
-       'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize',
-       'shadowsize']
+onlyuse = ['weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
+test_size = 0.1
+shuffle_cats = False
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -333,21 +335,29 @@ features = df.columns.values.astype('str') # get column names from dataframe
 XX = df.values # Get column values from dataframe
 XX = np.flipud(XX) # makes latest 5 minute tick XX[0] instead of XX[-1] (flips the array so most recent is at top)
 percentchange = XX[:,18] # Takes percentage train as variable to predict
-XX_wo_latest= XX[1:,:-1] # Takes off latest tick, as we're going to shift the 'percent change since last tick' down. It will become the 'percent change for the next tick'. Also removes the percentage change from the features list 
+XX = XX[1:,:-1] # Takes off latest tick, as we're going to shift the 'percent change since last tick' down. It will become the 'percent change for the next tick'. Also removes the percentage change from the features list 
 
-percentchange_fut=percentchange[:-1]
+yy=percentchange[:-1]
+# NEED TO CUT DOWN FEATURE COLUMNS HERE
+onlyusemask= [x in onlyuse for x in features]
+XX = XX.T[onlyusemask]
+XX = XX.T
+features = features[onlyusemask]
+# FEATURE GENERATION. Take feature values from last tick
+XX_generated = XX[1:]
+XX = np.hstack((XX,XX_generated))
 
-# NEED TO CUT DOWN FEATURE COLUMNS
-
-XX_train,yy_train,XX_test,yy_test = train_test_split(XX_wo_latest,percentchange_fut,test_size=0.1,shuffle=False)
+XX_train,XX_test,yy_train,yy_test = train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats)
 
 MLA = get_function(MLA) # Pulls in machine learning algorithm from settings
 clf = MLA().set_params(**MLAset)
 
+logger.info("Training model ... ")
 clf.fit(XX_train,yy_train)
-clf predict(XX_test)
+results = clf.predict(XX_test)
+mse=metrics.mean_squared_error(yy_test,results)
 
-
+logger.info("Model MSE: %s"%mse)
 #testwallet=1
 #def forward_search():
 #    global n_forw,n_forw_bad, for_run,result_for
