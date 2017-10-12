@@ -300,9 +300,13 @@ except Exception as e:
 logging.getLogger("poloniex").setLevel(logging.INFO)
 logging.getLogger('requests').setLevel(logging.ERROR)
 api = Poloniex(jsonNums=float)
-df = Chart(api, 'BTC_ETH').dataFrame()
-df.dropna(inplace=True)
 
+def updateChart(market):
+    df = Chart(api, market).dataFrame()
+    df.dropna(inplace=True)
+    return df
+
+df = updateChart('BTC_ETH')
 #testwallet=1
 #def forward_search():
 #    global n_forw,n_forw_bad, for_run,result_for
