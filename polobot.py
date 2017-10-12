@@ -38,7 +38,7 @@ MLAset = {'n_estimators': 256, 'n_jobs': 4, 'verbose': 1}
 onlyuse = ['weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
 test_size = 0.1
 shuffle_cats = False
-
+n_train=10000
 
 
 logger = logging.getLogger(__name__)
@@ -330,7 +330,6 @@ df = updateChart('BTC_ETH')
 ts = (df.index[-1] - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's')
 latest_time=datetime.utcfromtimestamp(ts)
 
-n_train=10000
 features = df.columns.values.astype('str') # get column names from dataframe
 XX = df.values # Get column values from dataframe
 XX = np.flipud(XX) # makes latest 5 minute tick XX[0] instead of XX[-1] (flips the array so most recent is at top)
@@ -359,6 +358,7 @@ results = clf.predict(XX_test)
 mse=metrics.mean_squared_error(yy_test,results)
 
 logger.info("Model MSE: %s"%mse)
+logger.info("Model RMSE: %s"%sqrt(mse))
 #testwallet=1
 #def forward_search():
 #    global n_forw,n_forw_bad, for_run,result_for
