@@ -32,10 +32,10 @@ from sklearn.model_selection import train_test_split
 
 # SETTINGS
 MLA = 'sklearn.ensemble.RandomForestRegressor'                             # Which MLA to load
-MLAset = {'n_estimators': 256, 'n_jobs': 4,'max_features': None, 'max_depth': None, 'verbose': 2}
+MLAset = {'n_estimators': 150, 'n_jobs': 4,'max_features': None, 'max_depth': 5, 'verbose': 2}
 # features to choose from:
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
-onlyuse = ['sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
+onlyuse = ['volume', 'weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
 test_size = 0.1
 shuffle_cats = False
 n_cat=30000
@@ -326,6 +326,15 @@ def get_function(function_string): # Used to set machine learning algorithm and 
     function = getattr(module, function)
     return function
 
+def zcmn_scaling(XX_train,XX_test):
+    tr_mean = np.mean(XX_train)
+    tr_std = np.std(XX_train)
+    XX_train-=tr_mean
+    XX_train/=tr_std
+    XX_test-=tr_mean
+    XX_test/=tr_std
+    return XX_train, XX_test
+
 df = updateChart('BTC_ETH')
 
 #ts = (df.index[-1] - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's')
@@ -350,7 +359,12 @@ yy = yy[:-1] # Take off the oldest prediction value to match
 
 XX = XX[0:n_cat] # Cut catalogue down to n_cat
 yy = yy[0:n_cat]
+
 XX_train,XX_test,yy_train,yy_test = train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats) # Split data into train and test set with test_size as ratio
+
+# SCALING
+where_vol=['volume' in x for x in onlyuse]
+XX_train[where_vol], XX_test[where_vol] = zcmn_scaling(XX_train,XX_test)
 
 MLA = get_function(MLA) # Pulls in machine learning algorithm from settings
 clf = MLA().set_params(**MLAset) # Sets the settings
