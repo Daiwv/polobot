@@ -348,14 +348,19 @@ def get_function(function_string): # Used to set machine learning algorithm and 
     function = getattr(module, function)
     return function
 
-def zcmn_scaling(XX_train,XX_test):
-    tr_mean = np.mean(XX_train)
-    tr_std = np.std(XX_train)
-    XX_train-=tr_mean
-    XX_train/=tr_std
-    XX_test-=tr_mean
-    XX_test/=tr_std
-    return XX_train, XX_test
+#def zcmn_scaling(XX_train,XX_test):
+#    tr_mean = np.mean(XX_train)
+#    tr_std = np.std(XX_train)
+#    XX_train-=tr_mean
+#    XX_train/=tr_std
+#    XX_test-=tr_mean
+#    XX_test/=tr_std
+#    return XX_train, XX_test
+def zcmn_scaling(array,means,stds):
+    for i in range(len(means)):
+        array[:,i]-=means[i]
+        array[:,i]/=stds[i]
+    return array
 
 df = updateChart('BTC_ETH')
 
@@ -370,10 +375,10 @@ XX = XX[1:,:-1] # Takes off latest tick to compensate for the shift, as we're go
 
 yy=percentchange[:-1] # Shift percentage change down
 # CUT DOWN FEATURE COLUMNS HERE
-onlyusemask= [x in onlyuse for x in features_all] # Filters down features to those only in onlyuse array
-XX = XX.T[np.array(onlyusemask)] # Need to do a stupid transpose
+onlyusemask= np.array([x in onlyuse for x in features_all]) # Filters down features to those only in onlyuse array
+XX = XX.T[onlyusemask] # Need to do a stupid transpose
 XX = XX.T
-features = features_all[np.array(onlyusemask)] # Filter feature labels
+features = features_all[onlyusemask] # Filter feature labels
 # FEATURE GENERATION. Take feature values from last tick
 XX_generated = XX[1:] # Give each 5 minute tick the technical indicator vals from last tick
 XX_difference = XX[:-1] - XX_generated 
@@ -387,8 +392,15 @@ XX_train,XX_test,yy_train,yy_test = \
 train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats) # Split data into train and test set with test_size as ratio
 
 # SCALING
+tr_means,tr_stds=[],[]
 for i in range(XX_train.shape[1]):
-    XX_train[:,i], XX_test[:,i] = zcmn_scaling(XX_train[:,i],XX_test[:,i])
+    tr_means.append(np.mean(XX_train[:,i]))
+    tr_stds.append(np.std(XX_train[:,i]))
+
+XX_train = zcmn_scaling(XX_train,tr_means,tr_stds)
+XX_test = zcmn_scaling(XX_test,tr_means,tr_stds)
+#for i in range(XX_train.shape[1]):
+#    XX_train[:,i], XX_test[:,i] = zcmn_scaling(XX_train[:,i],XX_test[:,i])
 
 model = Sequential()
 model.add(Dense(input_dim = XX_train.shape[1], output_dim = 256))
@@ -428,7 +440,17 @@ n_test=test_size*n_cat
 n_direction_corr = sum(pos_res==pos_test)
 logger.info('Percent of price direction correct: %0.4f'%(np.float(n_direction_corr)/np.float(n_test)))
 
-
+# GENERATE FEATURES FOR LATEST 5 MIN TICK
+latest_tick_all = df[-1:].values
+tick_before_latest_all = df[-2:-1].values
+latest_tick = latest_tick_all.T[onlyusemask]
+tick_before_latest= tick_before_latest_all.T[onlyusemask]
+latest_tick = latest_tick.T
+tick_before_latest = tick_before_latest.T
+tick_difference = latest_tick - tick_before_latest
+XX_latest = np.hstack((latest_tick,tick_before_latest,tick_difference))
+XX_latest = XX_latest[0]
+XX_latest = zcmn_scaling(XX_latest,tr_means,tr_stds)
 # OLD ARBITRAGE LOGIC - probably not needed for this code.
 #testwallet=1
 #def forward_search():
