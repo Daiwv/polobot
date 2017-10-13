@@ -10,11 +10,11 @@ from __future__ import print_function
 # SETTINGS
 #MLA = 'sklearn.ensemble.RandomForestRegressor'                             # Which MLA to load
 #MLAset = {'n_estimators': 150, 'n_jobs': 4,'max_features': None, 'max_depth': 7, 'verbose': 2}
-MLA='sklearn.neural_network.MLPRegressor'
-MLAset = {'hidden_layer_sizes': (256,256),'shuffle':False,'verbose': True,\
-'activation':"relu", 'solver':"adam", 'alpha':0.0001, 'batch_size':"auto", \
-'learning_rate':"constant", 'learning_rate_init':0.001, 'power_t':0.5, \
-'max_iter':200, 'tol':  0.0000001}#, 'early_stopping':True}
+#MLA='sklearn.neural_network.MLPRegressor'
+#MLAset = {'hidden_layer_sizes': (256,256),'shuffle':False,'verbose': True,\
+#'activation':"relu", 'solver':"adam", 'alpha':0.0001, 'batch_size':"auto", \
+#'learning_rate':"constant", 'learning_rate_init':0.001, 'power_t':0.5, \
+#'max_iter':200, 'tol':  0.0000001}#, 'early_stopping':True}
 # features to choose from:
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
 onlyuse = ['volume','weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi_24','rsi_12','rsi_8']
@@ -25,8 +25,8 @@ modelname='polo_btc_eth'
 load_old_model = False
 run_training = True
 run_pred= True
-batch_size = 10000
-epochs = 400
+batch_size = 5000
+epochs = 200
 
 # IMPORTS 
 import keras
@@ -391,15 +391,15 @@ for i in range(XX_train.shape[1]):
     XX_train[:,i], XX_test[:,i] = zcmn_scaling(XX_train[:,i],XX_test[:,i])
 
 model = Sequential()
-model.add(Dense(input_dim = XX_train.shape[1], output_dim = 1024))
+model.add(Dense(input_dim = XX_train.shape[1], output_dim = 256))
 model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 #model.add(Dropout(0.5))
-model.add(Dense(input_dim = 1024, output_dim = 256))
+model.add(Dense(input_dim = 256, output_dim = 256))
 model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 model.add(Dropout(0.5))
 model.add(Dense(input_dim = 256, output_dim = 64))
 model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-model.add(Dropout(0.5))
+model.add(Dropout(0.6))
 model.add(Dense(input_dim = 64, output_dim = 1))
 
 opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
@@ -412,7 +412,8 @@ if load_old_model == True:
 
 if run_training == True:
     model.summary()
-    model.fit(XX_train, yy_train,batch_size=batch_size,epochs=epochs,validation_data=(XX_test, yy_test),shuffle=shuffle_cats)
+    model.fit(XX_train, yy_train,batch_size=batch_size,epochs=epochs\
+    ,validation_data=(XX_test, yy_test),shuffle=shuffle_cats)
 
 if run_pred == True:
     results=model.predict(XX_test)
