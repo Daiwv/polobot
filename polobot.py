@@ -31,8 +31,13 @@ from sklearn import tree
 from sklearn.model_selection import train_test_split
 
 # SETTINGS
-MLA = 'sklearn.ensemble.RandomForestRegressor'                             # Which MLA to load
-MLAset = {'n_estimators': 150, 'n_jobs': 4,'max_features': None, 'max_depth': 5, 'verbose': 2}
+#MLA = 'sklearn.ensemble.RandomForestRegressor'                             # Which MLA to load
+#MLAset = {'n_estimators': 150, 'n_jobs': 4,'max_features': None, 'max_depth': 7, 'verbose': 2}
+MLA='sklearn.neural_network.MLPRegressor'
+MLAset = {'hidden_layer_sizes': (1024,256),'shuffle':False,'verbose': True,\
+'activation':"relu", 'solver':"adam", 'alpha':0.0001, 'batch_size':"auto", \
+'learning_rate':"adaptive", 'learning_rate_init':0.0001, 'power_t':0.5, \
+'max_iter':200, 'tol':  0.000001}#, 'early_stopping':True}
 # features to choose from:
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
 onlyuse = ['volume', 'weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
@@ -295,20 +300,18 @@ class dictTicker(object):
         if market:
             return self.tick[self._ids[market]]
         return self.tick
- 
-
 
 logging.basicConfig(level=logging.DEBUG)
-# websocket.enableTrace(True)
-ticker = dictTicker()
-try:
-    ticker.start() # Start listening to market tickers
-#    for i in range(3):
-#        sleep(5)
-#        pprint.pprint(ticker('USDT_BTC'))
-except Exception as e:
-    logger.exception(e)
-#ticker.stop()
+## websocket.enableTrace(True)
+#ticker = dictTicker()
+#try:
+#    ticker.start() # Start listening to market tickers
+##    for i in range(3):
+##        sleep(5)
+##        pprint.pprint(ticker('USDT_BTC'))
+#except Exception as e:
+#    logger.exception(e)
+##ticker.stop()
 
 logging.getLogger("poloniex").setLevel(logging.INFO)
 logging.getLogger('requests').setLevel(logging.ERROR)
@@ -364,7 +367,12 @@ XX_train,XX_test,yy_train,yy_test = train_test_split(XX,yy,test_size=test_size,s
 
 # SCALING
 where_vol=['volume' in x for x in onlyuse]
-XX_train[where_vol], XX_test[where_vol] = zcmn_scaling(XX_train[where_vol],XX_test[where_vol])
+vol_ind=np.where(where_vol)
+XX_train=XX_train.T
+XX_test = XX_test.T
+XX_train[vol_ind], XX_test[vol_ind] = zcmn_scaling(XX_train[vol_ind][0],XX_test[vol_ind][0])
+XX_train=XX_train.T
+XX_test = XX_test.T
 
 MLA = get_function(MLA) # Pulls in machine learning algorithm from settings
 clf = MLA().set_params(**MLAset) # Sets the settings
