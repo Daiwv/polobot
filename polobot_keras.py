@@ -449,8 +449,9 @@ latest_tick = latest_tick.T
 tick_before_latest = tick_before_latest.T
 tick_difference = latest_tick - tick_before_latest
 XX_latest = np.hstack((latest_tick,tick_before_latest,tick_difference))
-XX_latest = XX_latest[0]
 XX_latest = zcmn_scaling(XX_latest,tr_means,tr_stds)
+fut_prediction = model.predict(XX_latest)
+
 # OLD ARBITRAGE LOGIC - probably not needed for this code.
 #testwallet=1
 #def forward_search():
