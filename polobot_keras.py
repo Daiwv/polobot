@@ -7,6 +7,34 @@ Created on Thu Oct 12 17:30:36 2017
 
 from __future__ import print_function
 
+# SETTINGS
+#MLA = 'sklearn.ensemble.RandomForestRegressor'                             # Which MLA to load
+#MLAset = {'n_estimators': 150, 'n_jobs': 4,'max_features': None, 'max_depth': 7, 'verbose': 2}
+MLA='sklearn.neural_network.MLPRegressor'
+MLAset = {'hidden_layer_sizes': (256,256),'shuffle':False,'verbose': True,\
+'activation':"relu", 'solver':"adam", 'alpha':0.0001, 'batch_size':"auto", \
+'learning_rate':"constant", 'learning_rate_init':0.001, 'power_t':0.5, \
+'max_iter':200, 'tol':  0.0000001}#, 'early_stopping':True}
+# features to choose from:
+# array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
+onlyuse = ['weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
+test_size = 0.2
+shuffle_cats = True
+n_cat=50000
+modelname='polo_btc_eth'
+load_old_model = False
+run_training = True
+batch_size = 100
+epochs = 200
+
+# IMPORTS 
+import keras
+from keras.models import Sequential, Model, load_model
+from keras.layers import Dense, Dropout, Activation
+from keras.callbacks import ModelCheckpoint
+from keras import backend as K
+from keras.models import Model
+from keras.layers import Input
 import threading
 from poloniex import Poloniex
 polo = Poloniex()
@@ -29,22 +57,6 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn import metrics
 from sklearn import tree
 from sklearn.model_selection import train_test_split
-
-# SETTINGS
-#MLA = 'sklearn.ensemble.RandomForestRegressor'                             # Which MLA to load
-#MLAset = {'n_estimators': 150, 'n_jobs': 4,'max_features': None, 'max_depth': 7, 'verbose': 2}
-MLA='sklearn.neural_network.MLPRegressor'
-MLAset = {'hidden_layer_sizes': (256,256),'shuffle':False,'verbose': True,\
-'activation':"relu", 'solver':"adam", 'alpha':0.0001, 'batch_size':"auto", \
-'learning_rate':"constant", 'learning_rate_init':0.001, 'power_t':0.5, \
-'max_iter':200, 'tol':  0.0000001}#, 'early_stopping':True}
-# features to choose from:
-# array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
-onlyuse = ['weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
-test_size = 0.2
-shuffle_cats = True
-n_cat=50000
-
 
 logger = logging.getLogger(__name__)
 
@@ -376,25 +388,53 @@ if sum(where_vol) > 0:
     XX_train=XX_train.T
     XX_test = XX_test.T
 
-MLA = get_function(MLA) # Pulls in machine learning algorithm from settings
-clf = MLA().set_params(**MLAset) # Sets the settings
+#MLA = get_function(MLA) # Pulls in machine learning algorithm from settings
+#clf = MLA().set_params(**MLAset) # Sets the settings
+#logger.info("Training model ... ")
+#clf.fit(XX_train,yy_train) # Train model
+#results = clf.predict(XX_test) # Predict results of the test set.
 
-logger.info("Training model ... ")
-clf.fit(XX_train,yy_train) # Train model
-results = clf.predict(XX_test) # Predict results of the test set.
-mse=metrics.mean_squared_error(yy_test,results) # Get MSE
+model = Sequential()
+model = Sequential()
+model.add(Dense(input_dim = XX_train.shape[1], output_dim = 500))
+model.add(Activation('tanh'))
+model.add(Dropout(0.5))
+model.add(Dense(input_dim = 500, output_dim = 1))
+model.add(Activation('tanh'))
+# initiate RMSprop optimizer
+opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+#    opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.001)
+# Let's train the model using RMSprop
+model.compile(loss='mean_squared_error', optimizer='rmsprop', metrics=['accuracy'])
+filepath="weights-improv-{epoch:02d}-{val_acc:.2f}_%s.hdf5" %modelname
+checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+checkpoint_copy = ModelCheckpoint("%s.hdf5" %modelname, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+callbacks_list = [checkpoint,checkpoint_copy]
 
-logger.info("Model MSE: %s"%mse)
-logger.info("Model RMSE: %s"%np.sqrt(mse))
+if load_old_model == True:
+    siamese_net=load_model(modelname+".hdf5")
+#with tf.device('/device:SYCL:0'):
+if run_training == True:
+#            print('Using data augmentation.')
+    model.summary()
+    model.fit(XX_train, yy_train,batch_size=batch_size,epochs=epochs,validation_data=(XX_test, yy_test),shuffle=False, callbacks=[callbacks_list])
+#            hist=siamese_net.fit_generator(sg, steps_per_epoch=steps_per_epoch, nb_epoch=epochs, verbose=1, validation_data=sgt, validation_steps=validation_steps,max_q_size=4,pickle_safe=False, workers=4,initial_epoch=starting_epoch,callbacks=callbacks_list)
 
-percent_diff = results - yy_test
-plt.plot(range(len(percent_diff)),percent_diff) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
+#mse=metrics.mean_squared_error(yy_test,results) # Get MSE
+#
+#logger.info("Model MSE: %s"%mse)
+#logger.info("Model RMSE: %s"%np.sqrt(mse))
+#
+#percent_diff = results - yy_test
+#plt.plot(range(len(percent_diff)),percent_diff) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
+#
+#pos_res=results>0
+#pos_test=yy_test>0
+#n_test=test_size*n_cat
+#n_direction_corr = sum(pos_res==pos_test)
+#logger.info('Percent of price direction correct: %0.4f'%(np.float(n_direction_corr)/np.float(n_test)))
 
-pos_res=results>0
-pos_test=yy_test>0
-n_test=test_size*n_cat
-n_direction_corr = sum(pos_res==pos_test)
-logger.info('Percent of price direction correct: %0.4f'%(np.float(n_direction_corr)/np.float(n_test)))
+
 # OLD ARBITRAGE LOGIC - probably not needed for this code.
 #testwallet=1
 #def forward_search():
