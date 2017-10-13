@@ -34,16 +34,16 @@ from sklearn.model_selection import train_test_split
 #MLA = 'sklearn.ensemble.RandomForestRegressor'                             # Which MLA to load
 #MLAset = {'n_estimators': 150, 'n_jobs': 4,'max_features': None, 'max_depth': 7, 'verbose': 2}
 MLA='sklearn.neural_network.MLPRegressor'
-MLAset = {'hidden_layer_sizes': (1024,256),'shuffle':False,'verbose': True,\
-'activation':"relu", 'solver':"adam", 'alpha':0.0001, 'batch_size':"auto", \
-'learning_rate':"adaptive", 'learning_rate_init':0.0001, 'power_t':0.5, \
+MLAset = {'hidden_layer_sizes': (256,256),'shuffle':False,'verbose': True,\
+'activation':"relu", 'solver':"adam", 'alpha':0.0005, 'batch_size':"auto", \
+'learning_rate':"constant", 'learning_rate_init':0.0001, 'power_t':0.5, \
 'max_iter':200, 'tol':  0.000001}#, 'early_stopping':True}
 # features to choose from:
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
-onlyuse = ['volume', 'weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
-test_size = 0.1
+onlyuse = ['weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
+test_size = 0.2
 shuffle_cats = False
-n_cat=30000
+n_cat=50000
 
 
 logger = logging.getLogger(__name__)
@@ -367,12 +367,13 @@ XX_train,XX_test,yy_train,yy_test = train_test_split(XX,yy,test_size=test_size,s
 
 # SCALING
 where_vol=['volume' in x for x in onlyuse]
-vol_ind=np.where(where_vol)
-XX_train=XX_train.T
-XX_test = XX_test.T
-XX_train[vol_ind], XX_test[vol_ind] = zcmn_scaling(XX_train[vol_ind][0],XX_test[vol_ind][0])
-XX_train=XX_train.T
-XX_test = XX_test.T
+if sum(where_vol) > 0:
+    vol_ind=np.where(where_vol)
+    XX_train=XX_train.T
+    XX_test = XX_test.T
+    XX_train[vol_ind], XX_test[vol_ind] = zcmn_scaling(XX_train[vol_ind][0],XX_test[vol_ind][0])
+    XX_train=XX_train.T
+    XX_test = XX_test.T
 
 MLA = get_function(MLA) # Pulls in machine learning algorithm from settings
 clf = MLA().set_params(**MLAset) # Sets the settings
@@ -388,6 +389,11 @@ logger.info("Model RMSE: %s"%np.sqrt(mse))
 percent_diff = results - yy_test
 plt.plot(range(len(percent_diff)),percent_diff) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
 
+pos_res=results>0
+pos_test=yy_test>0
+n_test=test_size*n_cat
+n_direction_corr = sum(pos_res==pos_test)
+logger.info('Percent of price direction correct: %0.4f'%(np.float(n_direction_corr)/np.float(n_test)))
 # OLD ARBITRAGE LOGIC - probably not needed for this code.
 #testwallet=1
 #def forward_search():
