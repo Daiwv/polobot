@@ -373,7 +373,7 @@ yy=percentchange[:-1] # Shift percentage change down
 onlyusemask= [x in onlyuse for x in features_all] # Filters down features to those only in onlyuse array
 XX = XX.T[onlyusemask] # Need to do a stupid transpose
 XX = XX.T
-features = features_all[onlyusemask] # Filter feature labels
+features = features_all[np.array(onlyusemask)] # Filter feature labels
 # FEATURE GENERATION. Take feature values from last tick
 XX_generated = XX[1:] # Give each 5 minute tick the technical indicator vals from last tick
 XX_difference = XX[:-1] - XX_generated 
