@@ -371,7 +371,7 @@ XX = XX[1:,:-1] # Takes off latest tick to compensate for the shift, as we're go
 yy=percentchange[:-1] # Shift percentage change down
 # CUT DOWN FEATURE COLUMNS HERE
 onlyusemask= [x in onlyuse for x in features_all] # Filters down features to those only in onlyuse array
-XX = XX.T[onlyusemask] # Need to do a stupid transpose
+XX = XX.T[np.array(onlyusemask)] # Need to do a stupid transpose
 XX = XX.T
 features = features_all[np.array(onlyusemask)] # Filter feature labels
 # FEATURE GENERATION. Take feature values from last tick
@@ -383,7 +383,8 @@ yy = yy[:-1] # Take off the oldest prediction value to match
 XX = XX[0:n_cat] # Cut catalogue down to n_cat
 yy = yy[0:n_cat]
 
-XX_train,XX_test,yy_train,yy_test = train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats) # Split data into train and test set with test_size as ratio
+XX_train,XX_test,yy_train,yy_test = \
+train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats) # Split data into train and test set with test_size as ratio
 
 # SCALING
 for i in range(XX_train.shape[1]):
