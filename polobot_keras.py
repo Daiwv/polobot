@@ -364,7 +364,7 @@ percentchange = XX[:,18] # Takes percentage train as variable to predict
 XX = XX[1:,:-1] # Takes off latest tick to compensate for the shift, as we're going to shift the 'percent change since last tick' down. It will become the 'percent change for the next tick'. Also removes the percentage change from the features list 
 
 yy=percentchange[:-1] # Shift percentage change down
-# NEED TO CUT DOWN FEATURE COLUMNS HERE
+# CUT DOWN FEATURE COLUMNS HERE
 onlyusemask= [x in onlyuse for x in features] # Filters down features to those only in onlyuse array
 XX = XX.T[onlyusemask] # Need to do a stupid transpose
 XX = XX.T
@@ -381,28 +381,8 @@ yy = yy[0:n_cat]
 XX_train,XX_test,yy_train,yy_test = train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats) # Split data into train and test set with test_size as ratio
 
 # SCALING
-#where_vol=['volume' in x for x in onlyuse]
-#if sum(where_vol) > 0:
-#    vol_ind=np.where(where_vol)
-#    XX_train=XX_train.T
-#    XX_test = XX_test.T
-#    XX_train[vol_ind], XX_test[vol_ind] = zcmn_scaling(XX_train[vol_ind][0],XX_test[vol_ind][0])
-#    XX_train=XX_train.T
-#    XX_test = XX_test.T
-#XX_train=XX_train.T
-#XX_test = XX_test.T
 for i in range(XX_train.shape[1]):
     XX_train[:,i], XX_test[:,i] = zcmn_scaling(XX_train[:,i],XX_test[:,i])
-#XX_train=XX_train.T
-#XX_test = XX_test.T
-
-
-
-#MLA = get_function(MLA) # Pulls in machine learning algorithm from settings
-#clf = MLA().set_params(**MLAset) # Sets the settings
-#logger.info("Training model ... ")
-#clf.fit(XX_train,yy_train) # Train model
-#results = clf.predict(XX_test) # Predict results of the test set.
 
 model = Sequential()
 model.add(Dense(input_dim = XX_train.shape[1], output_dim = 1024))
@@ -415,11 +395,10 @@ model.add(Dense(input_dim = 256, output_dim = 64))
 model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 model.add(Dropout(0.5))
 model.add(Dense(input_dim = 64, output_dim = 1))
-# initiate RMSprop optimizer
+
 opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.1)
 #opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
 #    opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.001)
-# Let's train the model using RMSprop
 model.compile(loss='mean_squared_error', optimizer='rmsprop', metrics=['accuracy'])
 
 if load_old_model == True:
@@ -432,11 +411,7 @@ if run_training == True:
 if run_pred == True:
     results=model.predict(XX_test)
     results=results.T[0]
-#mse=metrics.mean_squared_error(yy_test,results) # Get MSE
-#
-#logger.info("Model MSE: %s"%mse)
-#logger.info("Model RMSE: %s"%np.sqrt(mse))
-#
+
 percent_diff = results - yy_test
 plt.plot(range(len(percent_diff)), results/yy_test) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
 plt.ylim(-10,10)
