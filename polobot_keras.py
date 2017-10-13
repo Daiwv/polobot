@@ -17,14 +17,14 @@ MLAset = {'hidden_layer_sizes': (256,256),'shuffle':False,'verbose': True,\
 'max_iter':200, 'tol':  0.0000001}#, 'early_stopping':True}
 # features to choose from:
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
-onlyuse = ['weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
+onlyuse = ['volume','weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
 test_size = 0.2
 shuffle_cats = True
 n_cat=50000
 modelname='polo_btc_eth'
 load_old_model = False
 run_training = True
-batch_size = 100
+batch_size = 1000
 epochs = 200
 
 # IMPORTS 
@@ -397,28 +397,25 @@ if sum(where_vol) > 0:
 model = Sequential()
 model = Sequential()
 model.add(Dense(input_dim = XX_train.shape[1], output_dim = 500))
-model.add(Activation('tanh'))
+model.add(Activation('relu'))
 model.add(Dropout(0.5))
-model.add(Dense(input_dim = 500, output_dim = 1))
-model.add(Activation('tanh'))
+model.add(Dense(input_dim = 256, output_dim = 64))
+model.add(Activation('relu'))
+model.add(Dropout(0.5))
+model.add(Dense(input_dim = 64, output_dim = 1))
+model.add(Activation('relu'))
 # initiate RMSprop optimizer
 opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
 #    opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.001)
 # Let's train the model using RMSprop
 model.compile(loss='mean_squared_error', optimizer='rmsprop', metrics=['accuracy'])
-filepath="weights-improv-{epoch:02d}-{val_acc:.2f}_%s.hdf5" %modelname
-checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
-checkpoint_copy = ModelCheckpoint("%s.hdf5" %modelname, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
-callbacks_list = [checkpoint,checkpoint_copy]
 
 if load_old_model == True:
-    siamese_net=load_model(modelname+".hdf5")
-#with tf.device('/device:SYCL:0'):
+    model=load_model(modelname+".hdf5")
+
 if run_training == True:
-#            print('Using data augmentation.')
     model.summary()
-    model.fit(XX_train, yy_train,batch_size=batch_size,epochs=epochs,validation_data=(XX_test, yy_test),shuffle=False, callbacks=[callbacks_list])
-#            hist=siamese_net.fit_generator(sg, steps_per_epoch=steps_per_epoch, nb_epoch=epochs, verbose=1, validation_data=sgt, validation_steps=validation_steps,max_q_size=4,pickle_safe=False, workers=4,initial_epoch=starting_epoch,callbacks=callbacks_list)
+    model.fit(XX_train, yy_train,batch_size=batch_size,epochs=epochs,validation_data=(XX_test, yy_test),shuffle=shuffle_cats)
 
 #mse=metrics.mean_squared_error(yy_test,results) # Get MSE
 #
