@@ -13,7 +13,7 @@ from __future__ import print_function
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
 onlyuse = ['volume','weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi_24','rsi_12','rsi_8']
 test_size = 0.2
-shuffle_cats = True
+shuffle_cats = False
 n_cat=6000
 modelname='polo_btc_eth'
 load_old_model = False
@@ -380,9 +380,8 @@ for i in range(XX_train.shape[1]):
 
 XX_train = zcmn_scaling(XX_train,tr_means,tr_stds)
 XX_test = zcmn_scaling(XX_test,tr_means,tr_stds)
-#for i in range(XX_train.shape[1]):
-#    XX_train[:,i], XX_test[:,i] = zcmn_scaling(XX_train[:,i],XX_test[:,i])
 
+# NN MODEL SETUP
 model = Sequential()
 model.add(Dense(input_dim = XX_train.shape[1], output_dim = 1024))
 #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
@@ -400,9 +399,13 @@ model.add(Dense(input_dim = 256, output_dim = 256))
 #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
 model.add(Dropout(0.5))
+model.add(Dense(input_dim = 256, output_dim = 256))
+#model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+model.add(keras.layers.advanced_activations.ELU(alpha=.5))
+model.add(Dropout(0.5))
 model.add(Dense(input_dim = 256, output_dim = 1))
 
-opt = keras.optimizers.Adam(lr=.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+opt = keras.optimizers.Adam(lr=.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.1)
 #opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
 #    opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.001)
 model.compile(loss='mean_squared_error', optimizer=opt, metrics=['accuracy'])
@@ -434,16 +437,16 @@ n_direction_corr = sum(pos_res==pos_test)
 logger.info('Percent of price direction correct: %0.4f'%(np.float(n_direction_corr)/np.float(n_test)))
 
 # GENERATE FEATURES FOR LATEST 5 MIN TICK AND PREDICT THE FUTURE
-latest_tick_all = df[-1:].values
-tick_before_latest_all = df[-2:-1].values
-latest_tick = latest_tick_all.T[onlyusemask]
+latest_tick_all = df[-1:].values # get all features from latest 5 min bin or tick, the one we're going to predict the price change of
+tick_before_latest_all = df[-2:-1].values # get all features from 5 min bin or tick before that
+latest_tick = latest_tick_all.T[onlyusemask] # filter out features we want
 tick_before_latest= tick_before_latest_all.T[onlyusemask]
-latest_tick = latest_tick.T
+latest_tick = latest_tick.T # Stupid transpose
 tick_before_latest = tick_before_latest.T
-tick_difference = latest_tick - tick_before_latest
-XX_latest = np.hstack((latest_tick,tick_before_latest,tick_difference))
-XX_latest = zcmn_scaling(XX_latest,tr_means,tr_stds)
-fut_prediction = model.predict(XX_latest)
+tick_difference = latest_tick - tick_before_latest # generate more features. the difference in features between ticks
+XX_latest = np.hstack((latest_tick,tick_before_latest,tick_difference)) # Stack all the features together
+XX_latest = zcmn_scaling(XX_latest,tr_means,tr_stds) # Scale it according to the training set's stats
+fut_prediction = model.predict(XX_latest) # PREDICT THE FUTURE
 
 # OLD ARBITRAGE LOGIC - probably not needed for this code.
 #testwallet=1
