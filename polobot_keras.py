@@ -19,12 +19,12 @@ MLAset = {'hidden_layer_sizes': (256,256),'shuffle':False,'verbose': True,\
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
 onlyuse = ['volume','weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
 test_size = 0.2
-shuffle_cats = True
+shuffle_cats = False
 n_cat=50000
 modelname='polo_btc_eth'
 load_old_model = False
 run_training = True
-batch_size = 1000
+batch_size = 10000
 epochs = 200
 
 # IMPORTS 
@@ -370,7 +370,7 @@ features = features[onlyusemask] # Filter feature labels
 # FEATURE GENERATION. Take feature values from last tick
 XX_generated = XX[1:] # Give each 5 minute tick the technical indicator vals from last tick
 XX_difference = XX[:-1] - XX_generated 
-XX = np.hstack((XX[:-1],XX_generated)) # Tack them on to catalogue and take off the oldest tick to compensate the shift
+XX = np.hstack((XX[:-1],XX_generated,XX_difference)) # Tack them on to catalogue and take off the oldest tick to compensate the shift
 yy = yy[:-1] # Take off the oldest prediction value to match
 
 XX = XX[0:n_cat] # Cut catalogue down to n_cat
@@ -379,14 +379,22 @@ yy = yy[0:n_cat]
 XX_train,XX_test,yy_train,yy_test = train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats) # Split data into train and test set with test_size as ratio
 
 # SCALING
-where_vol=['volume' in x for x in onlyuse]
-if sum(where_vol) > 0:
-    vol_ind=np.where(where_vol)
-    XX_train=XX_train.T
-    XX_test = XX_test.T
-    XX_train[vol_ind], XX_test[vol_ind] = zcmn_scaling(XX_train[vol_ind][0],XX_test[vol_ind][0])
-    XX_train=XX_train.T
-    XX_test = XX_test.T
+#where_vol=['volume' in x for x in onlyuse]
+#if sum(where_vol) > 0:
+#    vol_ind=np.where(where_vol)
+#    XX_train=XX_train.T
+#    XX_test = XX_test.T
+#    XX_train[vol_ind], XX_test[vol_ind] = zcmn_scaling(XX_train[vol_ind][0],XX_test[vol_ind][0])
+#    XX_train=XX_train.T
+#    XX_test = XX_test.T
+#XX_train=XX_train.T
+#XX_test = XX_test.T
+for i in range(XX_train.shape[1]):
+    XX_train[:,i], XX_test[:,i] = zcmn_scaling(XX_train[:,i],XX_test[:,i])
+#XX_train=XX_train.T
+#XX_test = XX_test.T
+
+
 
 #MLA = get_function(MLA) # Pulls in machine learning algorithm from settings
 #clf = MLA().set_params(**MLAset) # Sets the settings
@@ -396,7 +404,7 @@ if sum(where_vol) > 0:
 
 model = Sequential()
 model = Sequential()
-model.add(Dense(input_dim = XX_train.shape[1], output_dim = 500))
+model.add(Dense(input_dim = XX_train.shape[1], output_dim = 256))
 model.add(Activation('relu'))
 model.add(Dropout(0.5))
 model.add(Dense(input_dim = 256, output_dim = 64))
@@ -405,7 +413,8 @@ model.add(Dropout(0.5))
 model.add(Dense(input_dim = 64, output_dim = 1))
 model.add(Activation('relu'))
 # initiate RMSprop optimizer
-opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+#opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
 #    opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.001)
 # Let's train the model using RMSprop
 model.compile(loss='mean_squared_error', optimizer='rmsprop', metrics=['accuracy'])
