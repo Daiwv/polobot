@@ -20,12 +20,13 @@ MLAset = {'hidden_layer_sizes': (256,256),'shuffle':False,'verbose': True,\
 onlyuse = ['volume','weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
 test_size = 0.2
 shuffle_cats = False
-n_cat=50000
+n_cat=5000
 modelname='polo_btc_eth'
 load_old_model = False
 run_training = True
+run_pred= True
 batch_size = 10000
-epochs = 200
+epochs = 400
 
 # IMPORTS 
 import keras
@@ -65,6 +66,7 @@ def rsi(df, window, targetcol='weightedAverage', colname='rsi'):
     """ Calculates the Relative Strength Index (RSI) from a pandas dataframe
     http://stackoverflow.com/a/32346692/3389859
     """
+    colname = colname+'_%i'%window
     series = df[targetcol]
     delta = series.diff().dropna()
     u = delta * 0
@@ -403,18 +405,19 @@ for i in range(XX_train.shape[1]):
 #results = clf.predict(XX_test) # Predict results of the test set.
 
 model = Sequential()
-model = Sequential()
-model.add(Dense(input_dim = XX_train.shape[1], output_dim = 256))
-model.add(Activation('relu'))
+model.add(Dense(input_dim = XX_train.shape[1], output_dim = 1024))
+model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.01))
+#model.add(Dropout(0.5))
+model.add(Dense(input_dim = 1024, output_dim = 256))
+model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.05))
 model.add(Dropout(0.5))
 model.add(Dense(input_dim = 256, output_dim = 64))
-model.add(Activation('relu'))
+model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 model.add(Dropout(0.5))
 model.add(Dense(input_dim = 64, output_dim = 1))
-model.add(Activation('relu'))
 # initiate RMSprop optimizer
-#opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
+opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.1)
+#opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
 #    opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.001)
 # Let's train the model using RMSprop
 model.compile(loss='mean_squared_error', optimizer='rmsprop', metrics=['accuracy'])
@@ -426,19 +429,22 @@ if run_training == True:
     model.summary()
     model.fit(XX_train, yy_train,batch_size=batch_size,epochs=epochs,validation_data=(XX_test, yy_test),shuffle=shuffle_cats)
 
+if run_pred == True:
+    results=model.predict(XX_test)
+    results=results.T[0]
 #mse=metrics.mean_squared_error(yy_test,results) # Get MSE
 #
 #logger.info("Model MSE: %s"%mse)
 #logger.info("Model RMSE: %s"%np.sqrt(mse))
 #
-#percent_diff = results - yy_test
-#plt.plot(range(len(percent_diff)),percent_diff) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
-#
-#pos_res=results>0
-#pos_test=yy_test>0
-#n_test=test_size*n_cat
-#n_direction_corr = sum(pos_res==pos_test)
-#logger.info('Percent of price direction correct: %0.4f'%(np.float(n_direction_corr)/np.float(n_test)))
+percent_diff = results - yy_test
+plt.plot(range(len(percent_diff)),percent_diff) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
+
+pos_res=results>0
+pos_test=yy_test>0
+n_test=test_size*n_cat
+n_direction_corr = sum(pos_res==pos_test)
+logger.info('Percent of price direction correct: %0.4f'%(np.float(n_direction_corr)/np.float(n_test)))
 
 
 # OLD ARBITRAGE LOGIC - probably not needed for this code.
