@@ -402,10 +402,10 @@ model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
 model.add(Dropout(0.5))
 model.add(Dense(input_dim = 64, output_dim = 1))
 
-opt = keras.optimizers.Adam(lr=.0007, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
 #opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
 #    opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.001)
-model.compile(loss='mean_squared_error', optimizer='rmsprop', metrics=['accuracy'])
+model.compile(loss='mean_squared_error', optimizer=opt, metrics=['accuracy'])
 
 if load_old_model == True:
     model=load_model(modelname+".hdf5")
