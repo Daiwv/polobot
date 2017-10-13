@@ -17,7 +17,7 @@ MLAset = {'hidden_layer_sizes': (256,256),'shuffle':False,'verbose': True,\
 'max_iter':200, 'tol':  0.0000001}#, 'early_stopping':True}
 # features to choose from:
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
-onlyuse = ['volume','weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi']
+onlyuse = ['volume','weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi_24','rsi_12','rsi_8']
 test_size = 0.2
 shuffle_cats = False
 n_cat=5000
@@ -209,6 +209,8 @@ class Chart(object):
         df = macd(df)
         # add rsi
         df = rsi(df, window // 5)
+        df = rsi(df, window // 10)
+        df = rsi(df, window // 15)
         # add candle body and shadow size
         df['bodysize'] = df['open'] - df['close']
         df['shadowsize'] = df['high'] - df['low']
@@ -336,6 +338,9 @@ def updateChart(market): # updates given market when called
     df.dropna(inplace=True)
     return df
 
+def dropChart(market):
+    df.drop(df.index, inplace=True)
+
 def get_function(function_string): # Used to set machine learning algorithm and settings
     import importlib
     module, function = function_string.rsplit('.', 1)
@@ -357,18 +362,18 @@ df = updateChart('BTC_ETH')
 #ts = (df.index[-1] - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's')
 #latest_time=datetime.utcfromtimestamp(ts)
 
-features = df.columns.values.astype('str') # get column names from dataframe
+features_all = df.columns.values.astype('str') # get column names from dataframe
 XX = df.values # Get column values from dataframe
 XX = np.flipud(XX) # makes latest 5 minute tick XX[0] instead of XX[-1] (flips the array so most recent is at top)
-percentchange = XX[:,18] # Takes percentage train as variable to predict
+percentchange = XX[:,-1] # Takes percentage train as variable to predict
 XX = XX[1:,:-1] # Takes off latest tick to compensate for the shift, as we're going to shift the 'percent change since last tick' down. It will become the 'percent change for the next tick'. Also removes the percentage change from the features list 
 
 yy=percentchange[:-1] # Shift percentage change down
 # CUT DOWN FEATURE COLUMNS HERE
-onlyusemask= [x in onlyuse for x in features] # Filters down features to those only in onlyuse array
+onlyusemask= [x in onlyuse for x in features_all] # Filters down features to those only in onlyuse array
 XX = XX.T[onlyusemask] # Need to do a stupid transpose
 XX = XX.T
-features = features[onlyusemask] # Filter feature labels
+features = features_all[onlyusemask] # Filter feature labels
 # FEATURE GENERATION. Take feature values from last tick
 XX_generated = XX[1:] # Give each 5 minute tick the technical indicator vals from last tick
 XX_difference = XX[:-1] - XX_generated 
@@ -386,17 +391,17 @@ for i in range(XX_train.shape[1]):
 
 model = Sequential()
 model.add(Dense(input_dim = XX_train.shape[1], output_dim = 1024))
-model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.01))
+model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 #model.add(Dropout(0.5))
 model.add(Dense(input_dim = 1024, output_dim = 256))
-model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.05))
+model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 model.add(Dropout(0.5))
 model.add(Dense(input_dim = 256, output_dim = 64))
 model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 model.add(Dropout(0.5))
 model.add(Dense(input_dim = 64, output_dim = 1))
 
-opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.1)
+opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
 #opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
 #    opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.001)
 model.compile(loss='mean_squared_error', optimizer='rmsprop', metrics=['accuracy'])
