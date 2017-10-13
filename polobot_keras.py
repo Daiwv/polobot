@@ -438,8 +438,8 @@ if run_pred == True:
 #logger.info("Model RMSE: %s"%np.sqrt(mse))
 #
 percent_diff = results - yy_test
-plt.plot(range(len(percent_diff)),percent_diff) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
-
+plt.plot(range(len(percent_diff)), results/yy_test) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
+plt.ylim(-10,10)
 pos_res=results>0
 pos_test=yy_test>0
 n_test=test_size*n_cat
