@@ -8,24 +8,18 @@ Created on Thu Oct 12 17:30:36 2017
 from __future__ import print_function
 
 # SETTINGS
-#MLA = 'sklearn.ensemble.RandomForestRegressor'                             # Which MLA to load
-#MLAset = {'n_estimators': 150, 'n_jobs': 4,'max_features': None, 'max_depth': 7, 'verbose': 2}
-#MLA='sklearn.neural_network.MLPRegressor'
-#MLAset = {'hidden_layer_sizes': (256,256),'shuffle':False,'verbose': True,\
-#'activation':"relu", 'solver':"adam", 'alpha':0.0001, 'batch_size':"auto", \
-#'learning_rate':"constant", 'learning_rate_init':0.001, 'power_t':0.5, \
-#'max_iter':200, 'tol':  0.0000001}#, 'early_stopping':True}
+
 # features to choose from:
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
 onlyuse = ['volume','weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi_24','rsi_12','rsi_8']
 test_size = 0.2
-shuffle_cats = False
-n_cat=5000
+shuffle_cats = True
+n_cat=6000
 modelname='polo_btc_eth'
 load_old_model = False
 run_training = True
 run_pred= True
-batch_size = 5000
+batch_size = 6000
 epochs = 200
 
 # IMPORTS 
@@ -41,7 +35,6 @@ from poloniex import Poloniex
 polo = Poloniex()
 
 import websocket # pip install websocket-client
-
 from multiprocessing.dummy import Process as Thread
 import json
 import logging
@@ -54,9 +47,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from sklearn.ensemble import RandomForestRegressor
 from sklearn import metrics
-from sklearn import tree
 from sklearn.model_selection import train_test_split
 
 logger = logging.getLogger(__name__)
@@ -219,8 +210,6 @@ class Chart(object):
         return df
 
 
-
-
 class dictTicker(object):
 
     def __init__(self, api=None):
@@ -348,14 +337,6 @@ def get_function(function_string): # Used to set machine learning algorithm and 
     function = getattr(module, function)
     return function
 
-#def zcmn_scaling(XX_train,XX_test):
-#    tr_mean = np.mean(XX_train)
-#    tr_std = np.std(XX_train)
-#    XX_train-=tr_mean
-#    XX_train/=tr_std
-#    XX_test-=tr_mean
-#    XX_test/=tr_std
-#    return XX_train, XX_test
 def zcmn_scaling(array,means,stds):
     for i in range(len(means)):
         array[:,i]-=means[i]
@@ -403,18 +384,25 @@ XX_test = zcmn_scaling(XX_test,tr_means,tr_stds)
 #    XX_train[:,i], XX_test[:,i] = zcmn_scaling(XX_train[:,i],XX_test[:,i])
 
 model = Sequential()
-model.add(Dense(input_dim = XX_train.shape[1], output_dim = 256))
-model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+model.add(Dense(input_dim = XX_train.shape[1], output_dim = 1024))
+#model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+model.add(keras.layers.advanced_activations.ELU(alpha=.5))
 #model.add(Dropout(0.5))
+model.add(Dense(input_dim = 1024, output_dim = 256))
+model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
+#model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+model.add(Dropout(0.5))
 model.add(Dense(input_dim = 256, output_dim = 256))
-model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+#model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+model.add(keras.layers.advanced_activations.ELU(alpha=.5))
 model.add(Dropout(0.5))
 model.add(Dense(input_dim = 256, output_dim = 64))
-model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-model.add(Dropout(0.6))
+#model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
+model.add(Dropout(0.5))
 model.add(Dense(input_dim = 64, output_dim = 1))
 
-opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+opt = keras.optimizers.Adam(lr=.0007, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
 #opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
 #    opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.001)
 model.compile(loss='mean_squared_error', optimizer='rmsprop', metrics=['accuracy'])
@@ -431,6 +419,11 @@ if run_pred == True:
     results=model.predict(XX_test)
     results=results.T[0]
 
+mse=metrics.mean_squared_error(yy_test,results) # Get MSE		
+logger.info('Training data absolute mean of percentage price change (what we''re predicting: %0.4f'%np.mean(np.abs(yy_train)))
+logger.info("Model MSE (of predict cat): %s"%mse)		
+logger.info("Model RMSE (of predict cat): %s"%np.sqrt(mse))
+
 percent_diff = results - yy_test
 plt.plot(range(len(percent_diff)), results/yy_test) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
 plt.ylim(-10,10)
@@ -440,7 +433,7 @@ n_test=test_size*n_cat
 n_direction_corr = sum(pos_res==pos_test)
 logger.info('Percent of price direction correct: %0.4f'%(np.float(n_direction_corr)/np.float(n_test)))
 
-# GENERATE FEATURES FOR LATEST 5 MIN TICK
+# GENERATE FEATURES FOR LATEST 5 MIN TICK AND PREDICT THE FUTURE
 latest_tick_all = df[-1:].values
 tick_before_latest_all = df[-2:-1].values
 latest_tick = latest_tick_all.T[onlyusemask]
