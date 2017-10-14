@@ -3,6 +3,16 @@
 Created on Thu Oct 12 17:30:36 2017
 
 @author: xangma
+Code structure is as follows:
+
+Settings
+Imports
+Functions
+Preprocessing
+NN settings
+NN running
+Plotting and other random stuff
+
 """
 
 from __future__ import print_function
@@ -10,8 +20,8 @@ from __future__ import print_function
 # SETTINGS
 
 # features to choose from:
-# array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
-onlyuse = ['volume','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi_24','rsi_12','rsi_8']
+# array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi_24', 'bodysize', 'shadowsize', 'percentChange']
+onlyuse = ['bbrange', 'bbpercent','rsi_30','rsi_24','rsi_12','rsi_8','macd']
 
 test_size = 0.2
 shuffle_cats = False # maybe deprecated, check
@@ -21,7 +31,7 @@ load_old_model = False
 run_training = True
 run_pred= True
 batch_size = 10000
-epochs = 100
+epochs = 10000
 
 generate_features = False
 makedata_convtest= False
@@ -206,9 +216,11 @@ class Chart(object):
         # add macd
         df = macd(df)
         # add rsi
+        df = rsi(df, window // 4)
         df = rsi(df, window // 5)
         df = rsi(df, window // 10)
         df = rsi(df, window // 15)
+        df = rsi(df, window // 20)
         # add candle body and shadow size
         df['bodysize'] = df['open'] - df['close']
         df['shadowsize'] = df['high'] - df['low']
@@ -413,7 +425,7 @@ XX_test = zcmn_scaling(XX_test,tr_means,tr_stds)
 #    XX_train=XX_train.reshape(XX_train.shape[0],XX_train.shape[1],XX_train.shape[2],1)
 #    XX_test=XX_test.reshape(XX_test.shape[0],XX_test.shape[1],XX_test.shape[2],1)
 
-yy_train = np.round(yy_train,decimals=7)
+yy_train = np.round(yy_train,decimals=4)
 
 # NN MODEL SETUP
 if makedata_convtest == True:
@@ -443,31 +455,45 @@ if makedata_convtest == True:
     model.add(Dense(output_dim = 1))
 else:
     model = Sequential()
-    model.add(Dense(input_dim = XX_train.shape[1], output_dim = 1024))
+    model.add(Dense(input_dim = XX_train.shape[1], output_dim = 6))
     #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-    model.add(keras.layers.advanced_activations.ELU(alpha=.5))
+    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
     #model.add(Dropout(0.5))
-    model.add(Dense(input_dim = 1024, output_dim = 256))
+    model.add(Dense(input_dim = 6, output_dim = 4))
     model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
     #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
     model.add(Dropout(0.5))
-    model.add(Dense(input_dim = 256, output_dim = 256))
-    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-    model.add(keras.layers.advanced_activations.ELU(alpha=.5))
-    model.add(Dropout(0.5))
-    model.add(Dense(input_dim = 256, output_dim = 256))
-    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-    model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
-    model.add(Dropout(0.5))
-    model.add(Dense(input_dim = 256, output_dim = 256))
-    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-    model.add(keras.layers.advanced_activations.ELU(alpha=.5))
-    model.add(Dropout(0.5))
-    model.add(Dense(input_dim = 256, output_dim = 1))
+#    model.add(Dense(input_dim = 256, output_dim = 1024))
+#    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+#    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+#    model.add(Dropout(0.5))
+#    model.add(Dense(input_dim = 256, output_dim = 256))
+#    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+#    model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
+#    model.add(Dropout(0.5))
+#    model.add(Dense(input_dim = 256, output_dim = 256))
+#    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+#    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+#    model.add(Dropout(0.5))
+#    model.add(Dense(input_dim = 256, output_dim = 1024))
+#    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+#    model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
+#    model.add(Dropout(0.5))
+#    model.add(Dense(input_dim = 256, output_dim = 256))
+#    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+#    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+#    model.add(Dropout(0.5))
+#    model.add(Dense(input_dim = 256, output_dim = 256))
+#    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+#    model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
+#    model.add(Dropout(0.5))
+
+    model.add(Dense(input_dim = 4, output_dim = 1))
 
 opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+#opt = keras.optimizers.Nadam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
 #opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
-#    opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.001)
+#opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.01)
 model.compile(loss='mean_squared_error', optimizer=opt, metrics=['accuracy'])
 
 if load_old_model == True:
@@ -505,7 +531,9 @@ tick_before_latest= tick_before_latest_all.T[onlyusemask]
 latest_tick = latest_tick.T # Stupid transpose
 tick_before_latest = tick_before_latest.T
 tick_difference = latest_tick - tick_before_latest # generate more features. the difference in features between ticks
-XX_latest = np.hstack((latest_tick,tick_before_latest,tick_difference)) # Stack all the features together
+if generate_features ==True:
+    XX_latest = np.hstack((latest_tick,tick_before_latest,tick_difference)) # Stack all the features together
+else: XX_latest=latest_tick
 XX_latest = zcmn_scaling(XX_latest,tr_means,tr_stds) # Scale it according to the training set's stats
 fut_prediction = model.predict(XX_latest) # PREDICT THE FUTURE
 
