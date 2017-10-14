@@ -33,6 +33,7 @@ run_pred= True
 batch_size = 10000
 epochs = 10000
 
+price_dir_only = True
 generate_features = False
 makedata_convtest= False
 nb_ticks_history = 20
@@ -41,7 +42,7 @@ shuffle_whole_cat = False
 # IMPORTS 
 import keras
 from keras.models import Sequential, Model, load_model
-from keras.layers import Dense, Dropout, Activation, Conv1D, MaxPooling1D, Flatten
+from keras.layers import Dense, Dropout, Activation, Conv1D, MaxPooling1D, AveragePooling1D, Flatten
 from keras.callbacks import ModelCheckpoint
 from keras import backend as K
 from keras.models import Model
@@ -405,6 +406,10 @@ if shuffle_whole_cat == True:
 XX = XX[0:n_cat] # Cut catalogue down to n_cat
 yy = yy[0:n_cat]
 
+if price_dir_only == True:
+    yy = np.array(yy > 0).astype('int')
+    yy = keras.utils.to_categorical(yy, 2)
+
 XX_train,XX_test,yy_train,yy_test = \
 train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats) # Split data into train and test set with test_size as ratio
 
@@ -425,12 +430,12 @@ XX_test = zcmn_scaling(XX_test,tr_means,tr_stds)
 #    XX_train=XX_train.reshape(XX_train.shape[0],XX_train.shape[1],XX_train.shape[2],1)
 #    XX_test=XX_test.reshape(XX_test.shape[0],XX_test.shape[1],XX_test.shape[2],1)
 
-yy_train = np.round(yy_train,decimals=4)
+#yy_train = np.round(yy_train,decimals=8)
 
 # NN MODEL SETUP
 if makedata_convtest == True:
     model = Sequential()
-    model.add(Conv1D(input_shape=(nb_ticks_history, XX_train.shape[-1]),filters=64,kernel_size=10, strides=4))
+    model.add(Conv1D(input_shape=(nb_ticks_history, XX_train.shape[-1]),filters=32,kernel_size=3, strides=4))
     #model.add(Dense(input_dim = (XX_train.shape[1]), output_dim = 1024))
     #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
     model.add(keras.layers.advanced_activations.ELU(alpha=1.))
@@ -440,29 +445,29 @@ if makedata_convtest == True:
 #    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
 #    model.add(MaxPooling1D(pool_size=(2)))
     model.add(Flatten())
-    model.add(Dense(256))
+    model.add(Dense(4))
     model.add(keras.layers.advanced_activations.ELU(alpha=1.))
     model.add(Dropout(0.5))
-    #model.add(Dense(input_dim = 1024, output_dim = 256))
-    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-    #model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
-    #model.add(Dropout(0.5))
-    model.add(Dense(256))
-    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
-    #model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
-    model.add(Dropout(0.5))
+#    #model.add(Dense(input_dim = 1024, output_dim = 256))
+#    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+#    #model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
+#    #model.add(Dropout(0.5))
+#    model.add(Dense(256))
+#    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+#    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+#    #model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
+#    model.add(Dropout(0.5))
     model.add(Dense(output_dim = 1))
 else:
     model = Sequential()
-    model.add(Dense(input_dim = XX_train.shape[1], output_dim = 6))
+    model.add(Dense(input_dim = XX_train.shape[1], output_dim = 12))
     #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+    model.add(keras.layers.advanced_activations.ELU(alpha=.4))
     #model.add(Dropout(0.5))
-    model.add(Dense(input_dim = 6, output_dim = 4))
-    model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
+    model.add(Dense(input_dim = 12, output_dim = 4))
+    model.add(keras.layers.advanced_activations.PReLU(init='RandomUniform', weights=None))
     #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-    model.add(Dropout(0.5))
+    model.add(Dropout(0.4))
 #    model.add(Dense(input_dim = 256, output_dim = 1024))
 #    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 #    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
@@ -487,14 +492,19 @@ else:
 #    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 #    model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
 #    model.add(Dropout(0.5))
+    if price_dir_only == True:
+        model.add(Dense(2,activation="softmax"))
+    else:
+        model.add(Dense(input_dim = 2, output_dim = 1))
 
-    model.add(Dense(input_dim = 4, output_dim = 1))
-
-opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-#opt = keras.optimizers.Nadam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
+#opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+opt = keras.optimizers.Nadam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
 #opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
 #opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.01)
-model.compile(loss='mean_squared_error', optimizer=opt, metrics=['accuracy'])
+if price_dir_only == True:
+    model.compile(loss='categorical_crossentropy',optimizer=opt,metrics=['accuracy'])
+else:
+    model.compile(loss='mean_squared_error', optimizer=opt, metrics=['accuracy'])
 
 if load_old_model == True:
     model=load_model(modelname+".hdf5")
