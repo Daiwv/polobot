@@ -12,20 +12,27 @@ from __future__ import print_function
 # features to choose from:
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
 onlyuse = ['volume','weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi_24','rsi_12','rsi_8']
+onlyuse = ['emaslow', 'emafast', 'macd', 'rsi_24','rsi_12','rsi_8']
+
 test_size = 0.2
-shuffle_cats = False
-n_cat=6000
+shuffle_cats = False # maybe deprecated, check
+n_cat=10000
 modelname='polo_btc_eth'
 load_old_model = False
 run_training = True
 run_pred= True
-batch_size = 6000
-epochs = 200
+batch_size = 10000
+epochs = 1000
+
+generate_features = False
+makedata_convtest= True
+nb_ticks_history = 10
+shuffle_whole_cat = True
 
 # IMPORTS 
 import keras
 from keras.models import Sequential, Model, load_model
-from keras.layers import Dense, Dropout, Activation
+from keras.layers import Dense, Dropout, Activation, Conv1D, MaxPooling1D, Flatten
 from keras.callbacks import ModelCheckpoint
 from keras import backend as K
 from keras.models import Model
@@ -49,6 +56,7 @@ import matplotlib.pyplot as plt
 
 from sklearn import metrics
 from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 
 logger = logging.getLogger(__name__)
 
@@ -339,8 +347,12 @@ def get_function(function_string): # Used to set machine learning algorithm and 
 
 def zcmn_scaling(array,means,stds):
     for i in range(len(means)):
-        array[:,i]-=means[i]
-        array[:,i]/=stds[i]
+        if makedata_convtest == True:
+            array[:,:,i]-=means[i]
+            array[:,:,i]/=stds[i]
+        else:
+            array[:,i]-=means[i]
+            array[:,i]/=stds[i]
     return array
 
 df = updateChart('BTC_ETH')
@@ -357,14 +369,27 @@ XX = XX[1:,:-1] # Takes off latest tick to compensate for the shift, as we're go
 yy=percentchange[:-1] # Shift percentage change down
 # CUT DOWN FEATURE COLUMNS HERE
 onlyusemask= np.array([x in onlyuse for x in features_all]) # Filters down features to those only in onlyuse array
-XX = XX.T[onlyusemask] # Need to do a stupid transpose
+XX = XX.T[onlyusemask[:-1]] # Need to do a stupid transpose
 XX = XX.T
 features = features_all[onlyusemask] # Filter feature labels
 # FEATURE GENERATION. Take feature values from last tick
 XX_generated = XX[1:] # Give each 5 minute tick the technical indicator vals from last tick
 XX_difference = XX[:-1] - XX_generated 
-XX = np.hstack((XX[:-1],XX_generated,XX_difference)) # Tack them on to catalogue and take off the oldest tick to compensate the shift
+XX=XX[:-1]
 yy = yy[:-1] # Take off the oldest prediction value to match
+
+if generate_features == True:
+    XX = np.hstack((XX,XX_generated,XX_difference)) # Tack them on to catalogue and take off the oldest tick to compensate the shift
+
+if makedata_convtest == True:
+    XX_conv=[]
+    for i in range(len(XX)-nb_ticks_history):
+        XX_conv.append(XX[i:i+nb_ticks_history])
+    XX=np.array(XX_conv)
+    yy=yy[0:-nb_ticks_history]
+
+if shuffle_whole_cat == True:
+    XX,yy=shuffle(XX,yy)
 
 XX = XX[0:n_cat] # Cut catalogue down to n_cat
 yy = yy[0:n_cat]
@@ -374,38 +399,48 @@ train_test_split(XX,yy,test_size=test_size,shuffle=shuffle_cats) # Split data in
 
 # SCALING
 tr_means,tr_stds=[],[]
-for i in range(XX_train.shape[1]):
-    tr_means.append(np.mean(XX_train[:,i]))
-    tr_stds.append(np.std(XX_train[:,i]))
+for i in range(XX_train.shape[-1]):
+    if makedata_convtest ==True:
+        tr_means.append(np.mean(XX_train[:,0,i]))
+        tr_stds.append(np.std(XX_train[:,0,i]))
+    else:
+        tr_means.append(np.mean(XX_train[:,i]))
+        tr_stds.append(np.std(XX_train[:,i]))
 
 XX_train = zcmn_scaling(XX_train,tr_means,tr_stds)
 XX_test = zcmn_scaling(XX_test,tr_means,tr_stds)
 
+#if makedata_convtest == True:
+#    XX_train=XX_train.reshape(XX_train.shape[0],XX_train.shape[1],XX_train.shape[2],1)
+#    XX_test=XX_test.reshape(XX_test.shape[0],XX_test.shape[1],XX_test.shape[2],1)
+
 # NN MODEL SETUP
 model = Sequential()
-model.add(Dense(input_dim = XX_train.shape[1], output_dim = 1024))
+model.add(Conv1D(input_shape=(nb_ticks_history, XX_train.shape[-1]),filters=64,kernel_size=2, strides=3))
+#model.add(Dense(input_dim = (XX_train.shape[1]), output_dim = 1024))
 #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-model.add(keras.layers.advanced_activations.ELU(alpha=.5))
+model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+model.add(MaxPooling1D(pool_size=(2)))
+#model.add(Conv1D(filters=6,kernel_size=4, strides=4))
+##model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
+#model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+#model.add(MaxPooling1D(pool_size=(4)))
+model.add(Flatten())
+model.add(Dense(1024))
+model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+model.add(Dropout(0.5))
+#model.add(Dense(input_dim = 1024, output_dim = 256))
+#model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+#model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
 #model.add(Dropout(0.5))
-model.add(Dense(input_dim = 1024, output_dim = 256))
-model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
+model.add(Dense(256))
 #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+#model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
 model.add(Dropout(0.5))
-model.add(Dense(input_dim = 256, output_dim = 256))
-#model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-model.add(keras.layers.advanced_activations.ELU(alpha=.5))
-model.add(Dropout(0.5))
-model.add(Dense(input_dim = 256, output_dim = 256))
-#model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
-model.add(Dropout(0.5))
-model.add(Dense(input_dim = 256, output_dim = 256))
-#model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-model.add(keras.layers.advanced_activations.ELU(alpha=.5))
-model.add(Dropout(0.5))
-model.add(Dense(input_dim = 256, output_dim = 1))
+model.add(Dense(output_dim = 1))
 
-opt = keras.optimizers.Adam(lr=.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.1)
+opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
 #opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
 #    opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.001)
 model.compile(loss='mean_squared_error', optimizer=opt, metrics=['accuracy'])
@@ -436,6 +471,7 @@ n_test=test_size*n_cat
 n_direction_corr = sum(pos_res==pos_test)
 logger.info('Percent of price direction correct: %0.4f'%(np.float(n_direction_corr)/np.float(n_test)))
 
+# PUT THIS IN IT'S OWN FUNCTION THAT CHECKS FOR TICK UPDATES AND COMPUTES THIS
 # GENERATE FEATURES FOR LATEST 5 MIN TICK AND PREDICT THE FUTURE
 latest_tick_all = df[-1:].values # get all features from latest 5 min bin or tick, the one we're going to predict the price change of
 tick_before_latest_all = df[-2:-1].values # get all features from 5 min bin or tick before that
