@@ -11,8 +11,7 @@ from __future__ import print_function
 
 # features to choose from:
 # array(['close', 'high', 'low', 'open', 'quoteVolume', 'volume', 'weightedAverage', 'sma', 'bbtop', 'bbbottom', 'bbrange', 'bbpercent', 'emaslow', 'emafast', 'macd', 'rsi', 'bodysize', 'shadowsize', 'percentChange']
-onlyuse = ['volume','weightedAverage','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi_24','rsi_12','rsi_8']
-onlyuse = ['emaslow', 'emafast', 'macd', 'rsi_24','rsi_12','rsi_8']
+onlyuse = ['volume','sma', 'bbrange','bbpercent', 'emaslow', 'emafast', 'macd', 'rsi_24','rsi_12','rsi_8']
 
 test_size = 0.2
 shuffle_cats = False # maybe deprecated, check
@@ -22,12 +21,12 @@ load_old_model = False
 run_training = True
 run_pred= True
 batch_size = 10000
-epochs = 200
+epochs = 100
 
 generate_features = False
-makedata_convtest= True
-nb_ticks_history = 10
-shuffle_whole_cat = True
+makedata_convtest= False
+nb_ticks_history = 20
+shuffle_whole_cat = False
 
 # IMPORTS 
 import keras
@@ -414,20 +413,22 @@ XX_test = zcmn_scaling(XX_test,tr_means,tr_stds)
 #    XX_train=XX_train.reshape(XX_train.shape[0],XX_train.shape[1],XX_train.shape[2],1)
 #    XX_test=XX_test.reshape(XX_test.shape[0],XX_test.shape[1],XX_test.shape[2],1)
 
+yy_train = np.round(yy_train,decimals=7)
+
 # NN MODEL SETUP
 if makedata_convtest == True:
     model = Sequential()
-    model.add(Conv1D(input_shape=(nb_ticks_history, XX_train.shape[-1]),filters=64,kernel_size=2, strides=3))
+    model.add(Conv1D(input_shape=(nb_ticks_history, XX_train.shape[-1]),filters=64,kernel_size=10, strides=4))
     #model.add(Dense(input_dim = (XX_train.shape[1]), output_dim = 1024))
     #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
     model.add(keras.layers.advanced_activations.ELU(alpha=1.))
     model.add(MaxPooling1D(pool_size=(2)))
-    #model.add(Conv1D(filters=6,kernel_size=4, strides=4))
-    ##model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
-    #model.add(keras.layers.advanced_activations.ELU(alpha=1.))
-    #model.add(MaxPooling1D(pool_size=(4)))
+#    model.add(Conv1D(filters=32,kernel_size=3, strides=4))
+#    ##model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
+#    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+#    model.add(MaxPooling1D(pool_size=(2)))
     model.add(Flatten())
-    model.add(Dense(1024))
+    model.add(Dense(256))
     model.add(keras.layers.advanced_activations.ELU(alpha=1.))
     model.add(Dropout(0.5))
     #model.add(Dense(input_dim = 1024, output_dim = 256))
