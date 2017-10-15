@@ -25,19 +25,19 @@ onlyuse = ['bbrange', 'bbpercent','rsi_30','rsi_24','rsi_12','rsi_8','macd']
 
 test_size = 0.2
 shuffle_cats = False # maybe deprecated, check
-n_cat=10000
+n_cat=50000
 modelname='polo_btc_eth'
 load_old_model = False
 run_training = True
 run_pred= True
-batch_size = 10000
+batch_size = 50000
 epochs = 10000
 
 price_dir_only = True
 generate_features = False
-makedata_convtest= False
+makedata_convtest= True
 nb_ticks_history = 20
-shuffle_whole_cat = False
+shuffle_whole_cat = True
 
 # IMPORTS 
 import keras
@@ -367,6 +367,11 @@ def zcmn_scaling(array,means,stds):
             array[:,i]/=stds[i]
     return array
 
+from keras.activations import softmax
+
+def softMaxAxis1(x):
+    return softmax(x,axis=0)
+
 df = updateChart('BTC_ETH')
 
 #ts = (df.index[-1] - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's')
@@ -435,10 +440,10 @@ XX_test = zcmn_scaling(XX_test,tr_means,tr_stds)
 # NN MODEL SETUP
 if makedata_convtest == True:
     model = Sequential()
-    model.add(Conv1D(input_shape=(nb_ticks_history, XX_train.shape[-1]),filters=32,kernel_size=3, strides=4))
+    model.add(Conv1D(input_shape=(nb_ticks_history, XX_train.shape[-1]),filters=8,kernel_size=3, strides=4))
     #model.add(Dense(input_dim = (XX_train.shape[1]), output_dim = 1024))
-    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+    model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+#    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
     model.add(MaxPooling1D(pool_size=(2)))
 #    model.add(Conv1D(filters=32,kernel_size=3, strides=4))
 #    ##model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
@@ -447,7 +452,7 @@ if makedata_convtest == True:
     model.add(Flatten())
     model.add(Dense(4))
     model.add(keras.layers.advanced_activations.ELU(alpha=1.))
-    model.add(Dropout(0.5))
+    model.add(Dropout(0.55))
 #    #model.add(Dense(input_dim = 1024, output_dim = 256))
 #    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 #    #model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
@@ -457,17 +462,17 @@ if makedata_convtest == True:
 #    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
 #    #model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
 #    model.add(Dropout(0.5))
-    model.add(Dense(output_dim = 1))
+
 else:
     model = Sequential()
-    model.add(Dense(input_dim = XX_train.shape[1], output_dim = 12))
+    model.add(Dense(input_dim = XX_train.shape[1], output_dim = 128))
     #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-    model.add(keras.layers.advanced_activations.ELU(alpha=.4))
+    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
     #model.add(Dropout(0.5))
-    model.add(Dense(input_dim = 12, output_dim = 4))
-    model.add(keras.layers.advanced_activations.PReLU(init='RandomUniform', weights=None))
+    model.add(Dense(input_dim = 128, output_dim = 2))
+    model.add(keras.layers.advanced_activations.PReLU(init='zeros', weights=None))
     #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
-    model.add(Dropout(0.4))
+    model.add(Dropout(0.5))
 #    model.add(Dense(input_dim = 256, output_dim = 1024))
 #    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 #    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
@@ -492,13 +497,13 @@ else:
 #    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 #    model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
 #    model.add(Dropout(0.5))
-    if price_dir_only == True:
-        model.add(Dense(2,activation="softmax"))
-    else:
-        model.add(Dense(input_dim = 2, output_dim = 1))
+if price_dir_only == True:
+    model.add(Dense(2,activation=softMaxAxis1))
+else:
+    model.add(Dense(input_dim = 2, output_dim = 1))
 
-#opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-opt = keras.optimizers.Nadam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
+opt = keras.optimizers.Adam(lr=.0005, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+#opt = keras.optimizers.Nadam(lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004)
 #opt=keras.optimizers.RMSprop(lr=0.0001, rho=0.9, epsilon=1e-08, decay=0.0)
 #opt = keras.optimizers.SGD(lr=0.0005,momentum=0.8,decay=0.01)
 if price_dir_only == True:
@@ -517,6 +522,9 @@ if run_training == True:
 if run_pred == True:
     results=model.predict(XX_test)
     results=results.T[0]
+
+if price_dir_only == True:
+    yy_test=yy_test.T[1]
 
 mse=metrics.mean_squared_error(yy_test,results) # Get MSE		
 logger.info('Training data absolute mean of percentage price change (what we''re predicting: %0.4f'%np.mean(np.abs(yy_train)))
