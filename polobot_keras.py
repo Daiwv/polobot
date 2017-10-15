@@ -13,6 +13,11 @@ NN settings
 NN running
 Plotting and other random stuff
 
+# To do: 
+- Make only shuffle switch just for training data.
+- Change price_dir_only to be a 3 class problem instead of 2 like it is currently. This is so it can predict 0 price swing.
+- Create backtest function to simulate trades+ trading fees.
+
 """
 
 from __future__ import print_function
@@ -25,19 +30,20 @@ onlyuse = ['bbrange', 'bbpercent','rsi_30','rsi_24','rsi_12','rsi_8','macd']
 
 test_size = 0.2
 shuffle_cats = False # maybe deprecated, check
-n_cat=50000
+n_cat=20000
 modelname='polo_btc_eth'
 load_old_model = False
 run_training = True
 run_pred= True
-batch_size = 50000
-epochs = 10000
+batch_size = 20000
+epochs = 5000
 
 price_dir_only = True
 generate_features = False
 makedata_convtest= True
 nb_ticks_history = 20
 shuffle_whole_cat = True
+shuffle_training = True
 
 # IMPORTS 
 import keras
@@ -367,11 +373,6 @@ def zcmn_scaling(array,means,stds):
             array[:,i]/=stds[i]
     return array
 
-from keras.activations import softmax
-
-def softMaxAxis1(x):
-    return softmax(x,axis=0)
-
 df = updateChart('BTC_ETH')
 
 #ts = (df.index[-1] - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's')
@@ -451,8 +452,9 @@ if makedata_convtest == True:
 #    model.add(MaxPooling1D(pool_size=(2)))
     model.add(Flatten())
     model.add(Dense(4))
-    model.add(keras.layers.advanced_activations.ELU(alpha=1.))
-    model.add(Dropout(0.55))
+    #model.add(keras.layers.advanced_activations.ELU(alpha=1.))
+    model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
+    model.add(Dropout(0.50))
 #    #model.add(Dense(input_dim = 1024, output_dim = 256))
 #    #model.add(keras.layers.advanced_activations.LeakyReLU(alpha=0.1))
 #    #model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None))
@@ -498,7 +500,7 @@ else:
 #    model.add(keras.layers.advanced_activations.PReLU(init='zero', weights=None))
 #    model.add(Dropout(0.5))
 if price_dir_only == True:
-    model.add(Dense(2,activation=softMaxAxis1))
+    model.add(Dense(2,activation='softmax'))
 else:
     model.add(Dense(input_dim = 2, output_dim = 1))
 
@@ -521,24 +523,24 @@ if run_training == True:
 
 if run_pred == True:
     results=model.predict(XX_test)
-    results=results.T[0]
+    results=results[:,1]
 
 if price_dir_only == True:
-    yy_test=yy_test.T[1]
-
-mse=metrics.mean_squared_error(yy_test,results) # Get MSE		
-logger.info('Training data absolute mean of percentage price change (what we''re predicting: %0.4f'%np.mean(np.abs(yy_train)))
-logger.info("Model MSE (of predict cat): %s"%mse)		
-logger.info("Model RMSE (of predict cat): %s"%np.sqrt(mse))
-
-percent_diff = results - yy_test
-plt.plot(range(len(percent_diff)), results/yy_test) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
-plt.ylim(-10,10)
-pos_res=results>0
-pos_test=yy_test>0
-n_test=test_size*n_cat
-n_direction_corr = sum(pos_res==pos_test)
-logger.info('Percent of price direction correct: %0.4f'%(np.float(n_direction_corr)/np.float(n_test)))
+    yy_test=yy_test[:,1]
+    logger.info('Percent of price direction correct: %0.4f'%(np.float(sum(sum([results>.5] == yy_test))/np.float(len(yy_test)))))
+else:
+    mse=metrics.mean_squared_error(yy_test,results) # Get MSE		
+    logger.info('Training data absolute mean of percentage price change (what we''re predicting: %0.4f'%np.mean(np.abs(yy_train)))
+    logger.info("Model MSE (of predict cat): %s"%mse)		
+    logger.info("Model RMSE (of predict cat): %s"%np.sqrt(mse))
+    percent_diff = results - yy_test
+    plt.plot(range(len(percent_diff)), results/yy_test) # Silly plot I think is useful but it's not. I look at it because I'm lazy.
+    plt.ylim(-10,10)
+    pos_res=results>0
+    pos_test=yy_test>0
+    n_test=test_size*n_cat
+    n_direction_corr = sum(pos_res==pos_test)
+    logger.info('Percent of price direction correct: %0.4f'%(np.float(n_direction_corr)/np.float(n_test)))
 
 # PUT THIS IN IT'S OWN FUNCTION THAT CHECKS FOR TICK UPDATES AND COMPUTES THIS
 # GENERATE FEATURES FOR LATEST 5 MIN TICK AND PREDICT THE FUTURE
